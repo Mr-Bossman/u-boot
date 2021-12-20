@@ -22,6 +22,10 @@
 	u-boot,dm-spl;
 };
 
+&flexspi {
+	u-boot,dm-spl;
+};
+
 &clks {
 	u-boot,dm-spl;
 };
