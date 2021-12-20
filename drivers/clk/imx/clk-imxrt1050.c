@@ -111,6 +111,8 @@ static const char *const lpuart_sels[] = { "pll3_80m", "osc", };
 static const char *const semc_alt_sels[] = { "pll2_pfd2_396m", "pll3_pfd1_664_62m", };
 static const char *const semc_sels[] = { "periph_sel", "semc_alt_sel", };
 static const char *const lcdif_sels[] = { "pll2_sys", "pll3_pfd3_454_74m", "pll5_video", "pll2_pfd0_352m", "pll2_pfd1_594m", "pll3_pfd1_664_62m"};
+static const char *const flexspi_sels[] = { "semc_podf", "pll3_usb_otg", "pll2_pfd2_396m", "pll3_pfd0_720m"};
+
 
 static int imxrt1050_clk_probe(struct udevice *dev)
 {
@@ -190,6 +192,9 @@ static int imxrt1050_clk_probe(struct udevice *dev)
 	clk_dm(IMXRT1050_CLK_PLL3_PFD3_454_74M,
 	       imx_clk_pfd("pll3_pfd3_454_74m", "pll3_usb_otg", base + 0xf0,
 			   3));
+	clk_dm(IMXRT1050_CLK_PLL3_PFD0_720M,
+	       imx_clk_pfd("pll3_pfd0_720m", "pll3_usb_otg", base + 0xf0,
+			   0));
 
 	/* CCM clocks */
 	base = dev_read_addr_ptr(dev);
@@ -206,6 +211,9 @@ static int imxrt1050_clk_probe(struct udevice *dev)
 	clk_dm(IMXRT1050_CLK_PERIPH_SEL,
 	       imx_clk_mux("periph_sel", base + 0x14, 25, 1,
 			   periph_sels, ARRAY_SIZE(periph_sels)));
+	clk_dm(IMXRT1050_CLK_FSPI_SEL,
+	       imx_clk_mux("flexspi_sel", base + 0x1c, 29, 1,
+			   flexspi_sels, ARRAY_SIZE(flexspi_sels)));
 	clk_dm(IMXRT1050_CLK_USDHC1_SEL,
 	       imx_clk_mux("usdhc1_sel", base + 0x1c, 16, 1,
 			   usdhc_sels, ARRAY_SIZE(usdhc_sels)));
@@ -225,6 +233,9 @@ static int imxrt1050_clk_probe(struct udevice *dev)
 	       imx_clk_mux("lcdif_sel", base + 0x38, 15, 3,
 			   lcdif_sels, ARRAY_SIZE(lcdif_sels)));
 
+	clk_dm(IMXRT1050_CLK_FSPI_PODF,
+	       imx_clk_divider("flexspi_pdof", "flexspi_sel",
+			       base + 0x1c, 23, 3));
 	clk_dm(IMXRT1050_CLK_AHB_PODF,
 	       imx_clk_divider("ahb_podf", "periph_sel",
 			       base + 0x14, 10, 3));
@@ -247,6 +258,8 @@ static int imxrt1050_clk_probe(struct udevice *dev)
 	       imx_clk_divider("lcdif_podf", "lcdif_pred",
 			       base + 0x18, 23, 3));
 
+	clk_dm(IMXRT1050_CLK_FSPI,
+	       imx_clk_gate2("flexspi", "flexspi_pdof", base + 0x80, 10));
 	clk_dm(IMXRT1050_CLK_USDHC1,
 	       imx_clk_gate2("usdhc1", "usdhc1_podf", base + 0x80, 2));
 	clk_dm(IMXRT1050_CLK_USDHC2,
