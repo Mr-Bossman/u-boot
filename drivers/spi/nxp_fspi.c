@@ -52,13 +52,16 @@
 #include <linux/iopoll.h>
 #include <linux/bug.h>
 #include <linux/err.h>
+#include <asm/system.h>
 
 /*
  * The driver only uses one single LUT entry, that is updated on
  * each call of exec_op(). Index 0 is preset at boot with a basic
- * read operation, so let's use the last entry (31).
+ * read operation, so let's use the last entry (31). Last entry on imxrt(15)
  */
-#define	SEQID_LUT			31
+#define	SEQID_LUT			7
+#define	SEQID_LUT_READ			5
+#define	SEQID_LUT_WRITE			6
 
 /* Registers used by the driver */
 #define FSPI_MCR0			0x00
@@ -245,10 +248,13 @@
 #define FSPI_LUT_BASE			0x200
 #define FSPI_LUT_OFFSET			(SEQID_LUT * 4 * 4)
 #define FSPI_LUT_REG(idx) \
+	(FSPI_LUT_BASE + (idx) * 4)
+#define FSPI_LUT_SUQ_REG(idx) \
 	(FSPI_LUT_BASE + FSPI_LUT_OFFSET + (idx) * 4)
 
 /* register map end */
 
+#define LUT_COUNT 63
 /* Instruction set for the LUT register. */
 #define LUT_STOP			0x00
 #define LUT_CMD				0x01
@@ -305,6 +311,19 @@
 #define LUT_DEF(idx, ins, pad, opr)			  \
 	((((ins) << INSTR_SHIFT) | ((pad) << PAD_SHIFT) | \
 	(opr)) << (((idx) % 2) * OPRND_SHIFT))
+
+#define FSPI_FLSHCR2_AWRSEQID(n)		(((n) & 0x0F) << 8)
+#define FSPI_FLSHCR2_ARDSEQID(n)		(((n) & 0x0F) << 0)
+#define FSPI_LUT_OPCODE1(n)			(((n) & 0x3F) << 26)
+#define FSPI_LUT_NUM_PADS1(n)			(((n) & 0x03) << 24)
+#define FSPI_LUT_OPERAND1(n)			(((n) & 0xFF) << 16)
+#define FSPI_LUT_OPCODE0(n)			(((n) & 0x3F) << 10)
+#define FSPI_LUT_NUM_PADS0(n)			(((n) & 0x03) << 8)
+#define FSPI_LUT_OPERAND0(n)			(((n) & 0xFF) << 0)
+#define FSPI_LUT_INSTRUCTION(opcode, pads, operand) (\
+	(((opcode) & 0x3F) << 10) | (((pads) & 0x03) << 8) | ((operand) & 0xFF))
+#define LUT0(opcode, pads, operand) (FSPI_LUT_INSTRUCTION((opcode), (pads), (operand)))
+#define LUT1(opcode, pads, operand) (FSPI_LUT_INSTRUCTION((opcode), (pads), (operand)) << 16)
 
 #define POLL_TOUT		5000
 #define NXP_FSPI_MAX_CHIPSELECT		4
@@ -532,7 +551,7 @@ static void nxp_fspi_prepare_lut(struct nxp_fspi *f,
 
 	/* fill LUT */
 	for (i = 0; i < ARRAY_SIZE(lutval); i++)
-		fspi_writel(f, lutval[i], base + FSPI_LUT_REG(i));
+		fspi_writel(f, lutval[i], base + FSPI_LUT_SUQ_REG(i));
 
 	dev_dbg(f->dev, "CMD[%x] lutval[0:%x \t 1:%x \t 2:%x \t 3:%x], size: 0x%08x\n",
 		op->cmd.opcode, lutval[0], lutval[1], lutval[2], lutval[3], op->data.nbytes);
@@ -605,6 +624,16 @@ static void nxp_fspi_clk_disable_unprep(struct nxp_fspi *f)
  * Value for rest of the CS FLSHxxCR0 register would be zero.
  *
  */
+static void nxp_fspi_ahb_lut(struct nxp_fspi *f, u8 wr, u8 rd)
+{
+	void __iomem *base = f->iobase;
+	u32 reg = FSPI_FLSHCR2_AWRSEQID(wr) | FSPI_FLSHCR2_ARDSEQID(rd);
+	fspi_writel(f, reg, base + FSPI_FLSHA1CR2);
+	fspi_writel(f, reg, base + FSPI_FLSHA2CR2);
+	fspi_writel(f, reg, base + FSPI_FLSHB1CR2);
+	fspi_writel(f, reg, base + FSPI_FLSHB2CR2);
+}
+
 static void nxp_fspi_select_mem(struct nxp_fspi *f, int chip_select)
 {
 	u64 size_kb;
@@ -787,6 +816,7 @@ static int nxp_fspi_exec_op(struct spi_slave *slave,
 	 * to access the flash. Read via AHB bus may be corrupted due to
 	 * existence of an errata and therefore discard AHB read in such cases.
 	 */
+	nxp_fspi_ahb_lut(f, SEQID_LUT_WRITE, SEQID_LUT);
 	if (op->data.nbytes > (f->devtype_data->rxfifo - 4) &&
 	    op->data.dir == SPI_MEM_DATA_IN &&
 	    !needs_ip_only(f)) {
@@ -797,6 +827,7 @@ static int nxp_fspi_exec_op(struct spi_slave *slave,
 
 		err = nxp_fspi_do_op(f, op);
 	}
+	nxp_fspi_ahb_lut(f, SEQID_LUT_WRITE, SEQID_LUT_READ);
 
 	/* Invalidate the data in the AHB buffer. */
 	nxp_fspi_invalid(f);
@@ -859,6 +890,34 @@ static void erratum_err050568(struct nxp_fspi *f)
 }
 #endif
 
+static int nxp_fspi_command(struct nxp_fspi *f, u8 index, u32 addr)
+{
+	void __iomem *base = f->iobase;
+	int err;
+	fspi_writel(f, addr, base + FSPI_IPCR0);
+	fspi_writel(f, index << FSPI_IPCR1_SEQID_SHIFT ,base + FSPI_IPCR1);
+	fspi_writel(f, FSPI_IPCMD_TRG, base + FSPI_IPCMD);
+	err = fspi_readl_poll_tout(f, base + FSPI_INTR,
+				   FSPI_INTR_IPCMDDONE, 1, POLL_TOUT, true);
+	fspi_writel(f, FSPI_INTR_IPCMDDONE, base + FSPI_INTR);
+	return err;
+}
+
+static int nxp_fspi_nor_id(struct nxp_fspi *f, u8 index, u32 addr)
+{
+	void __iomem *base = f->iobase;
+	int err;
+	u32 id;
+	fspi_writel(f, addr, base + FSPI_IPCR0);
+	fspi_writel(f, (index << FSPI_IPCR1_SEQID_SHIFT) | 4,base + FSPI_IPCR1);
+	fspi_writel(f, FSPI_IPCMD_TRG, base + FSPI_IPCMD);
+	err = fspi_readl_poll_tout(f, base + FSPI_INTR,
+				   FSPI_INTR_IPCMDDONE, 1, POLL_TOUT, true);
+	id = fspi_readl(f, base + FSPI_RFDR);
+	fspi_writel(f, FSPI_INTR_IPCMDDONE | FSPI_INTR_IPRXWA, base + FSPI_INTR);
+	return id & 0xFFFF;
+}
+
 static int nxp_fspi_default_setup(struct nxp_fspi *f)
 {
 	void __iomem *base = f->iobase;
@@ -901,7 +960,9 @@ static int nxp_fspi_default_setup(struct nxp_fspi *f)
 
 	/* Reset the DLL register to default value */
 	fspi_writel(f, FSPI_DLLACR_OVRDEN, base + FSPI_DLLACR);
+	for(i = 0;i <101;i++)nop();// ERR011377
 	fspi_writel(f, FSPI_DLLBCR_OVRDEN, base + FSPI_DLLBCR);
+	for(i = 0;i <101;i++)nop(); // ERR011377
 
 	/* enable module */
 	fspi_writel(f, FSPI_MCR0_AHB_TIMEOUT(0xFF) | FSPI_MCR0_IP_TIMEOUT(0xFF),
@@ -931,10 +992,43 @@ static int nxp_fspi_default_setup(struct nxp_fspi *f)
 		    base + FSPI_AHBCR);
 
 	/* AHB Read - Set lut sequence ID for all CS. */
-	fspi_writel(f, SEQID_LUT, base + FSPI_FLSHA1CR2);
-	fspi_writel(f, SEQID_LUT, base + FSPI_FLSHA2CR2);
-	fspi_writel(f, SEQID_LUT, base + FSPI_FLSHB1CR2);
-	fspi_writel(f, SEQID_LUT, base + FSPI_FLSHB2CR2);
+	nxp_fspi_ahb_lut(f, SEQID_LUT_WRITE, SEQID_LUT_READ);
+
+	fspi_writel(f, FSPI_LUTKEY_VALUE, f->iobase + FSPI_LUTKEY);
+	fspi_writel(f, FSPI_LCKER_UNLOCK, f->iobase + FSPI_LCKCR);
+
+	for (i=0; i < LUT_COUNT; i++)
+		fspi_writel(f,0,base + FSPI_LUT_REG(i));
+	fspi_writel(f, FSPI_MCR0_SWRST, base + FSPI_MCR0);
+	ret = fspi_readl_poll_tout(f, f->iobase + FSPI_MCR0,
+				   FSPI_MCR0_SWRST, 0, POLL_TOUT, false);
+
+	// cmd index 0 = exit QPI mode
+	fspi_writel(f, LUT0(LUT_CMD, LUT_PAD(4), 0xF5),base + FSPI_LUT_REG(0));
+	// cmd index 1 = reset enable
+	fspi_writel(f, LUT0(LUT_CMD, LUT_PAD(1), 0x66),base + FSPI_LUT_REG(4));
+	// cmd index 2 = reset
+	fspi_writel(f, LUT0(LUT_CMD, LUT_PAD(1), 0x99),base + FSPI_LUT_REG(8));
+	// cmd index 3 = read ID bytes
+	fspi_writel(f, LUT0(LUT_CMD, LUT_PAD(1), 0x9F) | LUT1(LUT_DUMMY, LUT_PAD(1), 24),base + FSPI_LUT_REG(12));
+	fspi_writel(f, LUT0(LUT_NXP_READ, LUT_PAD(1), 1),base + FSPI_LUT_REG(13));
+	// cmd index 4 = enter QPI mode
+	fspi_writel(f, LUT0(LUT_CMD, LUT_PAD(1), 0x35),base + FSPI_LUT_REG(16));
+	// cmd index 5 = read QPI
+	fspi_writel(f, LUT0(LUT_CMD, LUT_PAD(1), 0x0B) | LUT1(LUT_ADDR, LUT_PAD(1), 24),base + FSPI_LUT_REG(20));
+	fspi_writel(f, LUT0(LUT_DUMMY, LUT_PAD(1), 8) | LUT1(LUT_NXP_READ, LUT_PAD(1), 1),base + FSPI_LUT_REG(21));
+	// cmd index 6 = write QPI
+	fspi_writel(f, LUT0(LUT_CMD, LUT_PAD(1), 0x02) | LUT1(LUT_ADDR, LUT_PAD(1), 24),base + FSPI_LUT_REG(24));
+	fspi_writel(f, LUT0(LUT_NXP_WRITE, LUT_PAD(1), 1),base + FSPI_LUT_REG(25));
+
+	fspi_writel(f, FSPI_LUTKEY_VALUE, f->iobase + FSPI_LUTKEY);
+	fspi_writel(f, FSPI_LCKER_LOCK, f->iobase + FSPI_LCKCR);
+	nxp_fspi_command(f, 0, 0); // exit quad mode
+	nxp_fspi_command(f, 1, 0); // reset enable
+	nxp_fspi_command(f, 2, 0); // reset
+	reg = nxp_fspi_nor_id(f, 3, 0); // tmp set my chip to qspi
+	dev_err(f->dev, "JEDEC ID: 0x%0x\n", reg);
+	//nxp_fspi_command(f, 4, 0); // tmp set my chip to qspi
 
 	return 0;
 }
@@ -992,31 +1086,33 @@ static int nxp_fspi_set_mode(struct udevice *bus, uint mode)
 static int nxp_fspi_of_to_plat(struct udevice *bus)
 {
 	struct nxp_fspi *f = dev_get_priv(bus);
-#if CONFIG_IS_ENABLED(CLK)
 	int ret;
-#endif
-
-	fdt_addr_t iobase;
-	fdt_addr_t iobase_size;
-	fdt_addr_t ahb_addr;
-	fdt_addr_t ahb_size;
+	const void *blob = gd->fdt_blob;
+	int node = dev_of_offset(bus);
+	struct fdt_resource res;
 
 	f->dev = bus;
 
-	iobase = devfdt_get_addr_size_name(bus, "fspi_base", &iobase_size);
-	if (iobase == FDT_ADDR_T_NONE) {
-		dev_err(bus, "fspi_base regs missing\n");
-		return -ENODEV;
+	/* find the resources */
+	ret = fdt_get_named_resource(blob, node, "reg", "reg-names", "fspi_base",
+				     &res);
+	if (ret) {
+		dev_err(bus, "Can't get regs fspi_base address(ret = %d)!\n", ret);
+		return -ENOMEM;
 	}
-	f->iobase = map_physmem(iobase, iobase_size, MAP_NOCACHE);
 
-	ahb_addr = devfdt_get_addr_size_name(bus, "fspi_mmap", &ahb_size);
-	if (ahb_addr == FDT_ADDR_T_NONE) {
-		dev_err(bus, "fspi_mmap regs missing\n");
-		return -ENODEV;
+	f->iobase = map_physmem(res.start, res.end - res.start, MAP_NOCACHE);
+
+	ret = fdt_get_named_resource(blob, node, "reg", "reg-names",
+				     "fspi_mmap", &res);
+	if (ret) {
+		dev_err(bus, "Can't get fspi_mmap base address(ret = %d)!\n", ret);
+		return -ENOMEM;
 	}
-	f->ahb_addr = map_physmem(ahb_addr, ahb_size, MAP_NOCACHE);
-	f->memmap_phy_size = ahb_size;
+
+	f->ahb_addr = map_physmem(res.start, res.end - res.start, MAP_NOCACHE);
+	f->memmap_phy = res.start;
+	f->memmap_phy_size = (res.end - res.start)+1;
 
 #if CONFIG_IS_ENABLED(CLK)
 	ret = clk_get_by_name(bus, "fspi_en", &f->clk_en);
@@ -1032,7 +1128,7 @@ static int nxp_fspi_of_to_plat(struct udevice *bus)
 	}
 #endif
 
-	dev_dbg(bus, "iobase=<0x%llx>, ahb_addr=<0x%llx>\n", iobase, ahb_addr);
+	dev_dbg(bus, "iobase=<0x%p>, ahb_addr=<0x%p>\n", f->iobase, f->ahb_addr);
 
 	return 0;
 }
