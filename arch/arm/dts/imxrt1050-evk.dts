@@ -43,8 +43,8 @@
 		reg = <0>;
 		spi-max-frequency = <33000000>;
 		status = "okay";
-		spi-tx-bus-width = <4>;
-		spi-rx-bus-width = <4>;
+		spi-tx-bus-width = <1>;
+		spi-rx-bus-width = <1>;
 	};
 };
 

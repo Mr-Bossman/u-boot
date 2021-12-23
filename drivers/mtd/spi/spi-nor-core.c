@@ -289,7 +289,7 @@ static int spi_nor_read_reg(struct spi_nor *nor, u8 code, u8 *val, int len)
 {
 	struct spi_mem_op op = SPI_MEM_OP(SPI_MEM_OP_CMD(code, 0),
 					  SPI_MEM_OP_NO_ADDR,
-					  SPI_MEM_OP_NO_DUMMY,
+					  SPI_MEM_OP_DUMMY(3, 1),
 					  SPI_MEM_OP_DATA_IN(len, NULL, 0));
 	int ret;
 

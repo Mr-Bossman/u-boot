@@ -304,7 +304,7 @@ const struct flash_info spi_nor_ids[] = {
 			SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ |
 			SPI_NOR_HAS_LOCK | SPI_NOR_HAS_TB)
 	},
-	{ INFO("w25x32", 0xef3016, 0, 64 * 1024,  64, SECT_4K) },
+	{ INFO("w25x32", 0x0d5d52, 0, 64 * 1024,  64, SECT_4K) },
 	{ INFO("w25q20cl", 0xef4012, 0, 64 * 1024,  4, SECT_4K) },
 	{ INFO("w25q20bw", 0xef5012, 0, 64 * 1024,  4, SECT_4K) },
 	{ INFO("w25q20ew", 0xef6012, 0, 64 * 1024,  4, SECT_4K) },
