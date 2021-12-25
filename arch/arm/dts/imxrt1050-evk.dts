@@ -36,15 +36,16 @@
 	pinctrl-0 = <&pinctrl_fspi>;
 	pinctrl-names = "default";
 	status = "okay";
-	psram: flash@0 {
+	psram: psram@0 {
 		#address-cells = <1>;
 		#size-cells = <1>;
 		compatible =  "sst,w25x32","jedec,spi-nor";
 		reg = <0>;
 		spi-max-frequency = <33000000>;
-		status = "okay";
 		spi-tx-bus-width = <1>;
 		spi-rx-bus-width = <1>;
+		u-boot,dm-spl;
+		status = "okay";
 	};
 };
 

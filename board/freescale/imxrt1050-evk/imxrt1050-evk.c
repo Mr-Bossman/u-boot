@@ -3,7 +3,7 @@
  * Copyright (C) 2019
  * Author(s): Giulio Benetti <giulio.benetti@benettiengineering.com>
  */
-
+#define DEBUG
 #include <common.h>
 #include <dm.h>
 #include <init.h>
@@ -58,11 +58,22 @@ int spl_dram_init(void)
 	return rv;
 }
 
+int spl_psram_init(void)
+{
+	struct udevice *dev;
+	int rv;
+	rv = uclass_get_device(UCLASS_SPI_FLASH,0,&dev);
+	if (rv)
+		debug("FLASH init failed: %d\n", rv);
+	return rv;
+}
+
 void spl_board_init(void)
 {
 	preloader_console_init();
 	spl_dram_init();
 	arch_cpu_init(); /* to configure mpu for sdram rw permissions */
+	spl_psram_init();
 }
 
 u32 spl_boot_device(void)

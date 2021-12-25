@@ -82,6 +82,9 @@
 		pinctrl_usdhc0: usdhc0grp {
 			u-boot,dm-spl;
 		};
+		pinctrl_fspi: fspigrp {
+			u-boot,dm-spl;
+		};
 	};
 };
 
