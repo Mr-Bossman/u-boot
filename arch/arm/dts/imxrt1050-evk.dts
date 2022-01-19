@@ -36,7 +36,7 @@
 	pinctrl-0 = <&pinctrl_fspi>;
 	pinctrl-names = "default";
 	//status = "okay";
-	psram: psram@0 {
+	/*psram: psram@0 {
 		#address-cells = <1>;
 		#size-cells = <1>;
 		compatible =  "sst,w25x32","jedec,spi-nor";
@@ -45,8 +45,8 @@
 		spi-tx-bus-width = <1>;
 		spi-rx-bus-width = <1>;
 		u-boot,dm-spl;
-		//status = "okay";
-	};
+		status = "okay";
+	};*/
 };
 
 &flexspi2 {
@@ -236,7 +236,6 @@
 
 		pinctrl_fspi2: fspigrp2 {
 			fsl,pins = <
-				MXRT1060_IOMUXC_GPIO_EMC_22_FLEXSPI2_A_SS1_B 0x1B0F9
 				MXRT1060_IOMUXC_GPIO_EMC_23_FLEXSPI2_A_DQS 0x110F9
 				MXRT1060_IOMUXC_GPIO_EMC_24_FLEXSPI2_A_SS0_B 0x1B0F9
 				MXRT1060_IOMUXC_GPIO_EMC_25_FLEXSPI2_A_SCLK 0x100F9
