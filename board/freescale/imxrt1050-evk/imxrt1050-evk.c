@@ -72,7 +72,7 @@ int spl_psram_init(void)
 void spl_board_init(void)
 {
 	preloader_console_init();
-	spl_dram_init();
+	//spl_dram_init();
 	arch_cpu_init(); /* to configure mpu for sdram rw permissions */
 	spl_psram_init();
 }
