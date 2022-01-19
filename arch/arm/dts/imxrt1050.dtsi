@@ -58,18 +58,33 @@
 			reg = <0x401f8000 0x4000>;
 			fsl,mux_mask = <0x7>;
 		};
+
 		flexspi: spi@402a8000 {
 				#address-cells = <1>;
 				#size-cells = <0>;
 				compatible = "nxp,imx8mm-fspi";
-				reg = <0x402a8000 0x4000>, <0x60000000 0x4000000>;
+				reg = <0x402a8000 0x4000>, <0x60000000 0x10000000>;
 				reg-names = "fspi_base", "fspi_mmap";
 				interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
 				clocks = <&clks IMXRT1050_CLK_FSPI>,
 					 <&clks IMXRT1050_CLK_FSPI>;
 				clock-names = "fspi", "fspi_en";
 				status = "disabled";
-			};
+		};
+
+		flexspi2: spi@402a4000 {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				compatible = "nxp,imx8mm-fspi";
+				reg = <0x402a4000 0x4000>, <0x70000000 0x0f000000>;
+				reg-names = "fspi_base", "fspi_mmap";
+				interrupts = <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
+				clocks = <&clks IMXRT1050_CLK_FSPI2>,
+					 <&clks IMXRT1050_CLK_FSPI2>;
+				clock-names = "fspi", "fspi_en";
+				status = "disabled";
+		};
+
 		clks: ccm@400fc000 {
 			compatible = "fsl,imxrt1050-ccm";
 			reg = <0x400fc000 0x4000>;

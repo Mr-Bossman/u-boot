@@ -112,6 +112,7 @@ static const char *const semc_alt_sels[] = { "pll2_pfd2_396m", "pll3_pfd1_664_62
 static const char *const semc_sels[] = { "periph_sel", "semc_alt_sel", };
 static const char *const lcdif_sels[] = { "pll2_sys", "pll3_pfd3_454_74m", "pll5_video", "pll2_pfd0_352m", "pll2_pfd1_594m", "pll3_pfd1_664_62m"};
 static const char *const flexspi_sels[] = { "semc_podf", "pll3_usb_otg", "pll2_pfd2_396m", "pll3_pfd0_720m"};
+static const char *const flexspi2_sels[] = { "pll2_sys", "pll3_pfd1_664_62m", "pll2_pfd2_396m", "pll3_pfd0_720m"};
 
 
 static int imxrt1050_clk_probe(struct udevice *dev)
@@ -214,6 +215,9 @@ static int imxrt1050_clk_probe(struct udevice *dev)
 	clk_dm(IMXRT1050_CLK_FSPI_SEL,
 	       imx_clk_mux("flexspi_sel", base + 0x1c, 29, 1,
 			   flexspi_sels, ARRAY_SIZE(flexspi_sels)));
+	clk_dm(IMXRT1050_CLK_FSPI2_SEL,
+	       imx_clk_mux("flexspi2_sel", base + 0x18, 8, 2,
+			   flexspi2_sels, ARRAY_SIZE(flexspi2_sels)));
 	clk_dm(IMXRT1050_CLK_USDHC1_SEL,
 	       imx_clk_mux("usdhc1_sel", base + 0x1c, 16, 1,
 			   usdhc_sels, ARRAY_SIZE(usdhc_sels)));
@@ -233,6 +237,9 @@ static int imxrt1050_clk_probe(struct udevice *dev)
 	       imx_clk_mux("lcdif_sel", base + 0x38, 15, 3,
 			   lcdif_sels, ARRAY_SIZE(lcdif_sels)));
 
+	clk_dm(IMXRT1050_CLK_FSPI2_PODF,
+	       imx_clk_divider("flexspi2_pdof", "flexspi2_sel",
+			       base + 0x18, 29, 3));
 	clk_dm(IMXRT1050_CLK_FSPI_PODF,
 	       imx_clk_divider("flexspi_pdof", "flexspi_sel",
 			       base + 0x1c, 23, 3));
@@ -258,6 +265,8 @@ static int imxrt1050_clk_probe(struct udevice *dev)
 	       imx_clk_divider("lcdif_podf", "lcdif_pred",
 			       base + 0x18, 23, 3));
 
+	clk_dm(IMXRT1050_CLK_FSPI2,
+	       imx_clk_gate2("flexspi2", "flexspi2_pdof", base + 0x84, 2));
 	clk_dm(IMXRT1050_CLK_FSPI,
 	       imx_clk_gate2("flexspi", "flexspi_pdof", base + 0x80, 10));
 	clk_dm(IMXRT1050_CLK_USDHC1,

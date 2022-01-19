@@ -30,6 +30,14 @@
 	u-boot,dm-spl;
 };
 
+&flexspi {
+	u-boot,dm-spl;
+};
+
+&flexspi2 {
+	u-boot,dm-spl;
+};
+
 &gpio1 {
 	u-boot,dm-spl;
 };
@@ -82,7 +90,12 @@
 		pinctrl_usdhc0: usdhc0grp {
 			u-boot,dm-spl;
 		};
+
 		pinctrl_fspi: fspigrp {
+			u-boot,dm-spl;
+		};
+
+		pinctrl_fspi2: fspigrp2 {
 			u-boot,dm-spl;
 		};
 	};
