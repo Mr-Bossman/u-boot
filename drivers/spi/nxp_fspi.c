@@ -57,9 +57,13 @@
 /*
  * The driver only uses one single LUT entry, that is updated on
  * each call of exec_op(). Index 0 is preset at boot with a basic
- * read operation, so let's use the last entry (31).
+ * read operation, so let's use the last entry (15) on i.MXRT on everything else (31).
+ * LUT_COUNT is the total 32-bit registers we have for LUTs.
  */
-#define	SEQID_LUT			31
+#define	SEQID_LUT			15
+#define	SEQID_LUT_READ			5
+#define	SEQID_LUT_WRITE			6
+#define LUT_COUNT 63
 
 /* Registers used by the driver */
 #define FSPI_MCR0			0x00
@@ -246,6 +250,8 @@
 #define FSPI_LUT_BASE			0x200
 #define FSPI_LUT_OFFSET			(SEQID_LUT * 4 * 4)
 #define FSPI_LUT_REG(idx) \
+	(FSPI_LUT_BASE + (idx) * 4)
+#define FSPI_LUT_SUQ_REG(idx) \
 	(FSPI_LUT_BASE + FSPI_LUT_OFFSET + (idx) * 4)
 
 /* register map end */
@@ -333,6 +339,14 @@ static struct nxp_fspi_devtype_data imx8mm_data = {
 	.rxfifo = SZ_512,       /* (64  * 64 bits)  */
 	.txfifo = SZ_1K,        /* (128 * 64 bits)  */
 	.ahb_buf_size = SZ_2K,  /* (256 * 64 bits)  */
+	.quirks = 0,
+	.little_endian = true,  /* little-endian    */
+};
+
+static struct nxp_fspi_devtype_data imxrt1050_data = {
+	.rxfifo = SZ_128,       /* (128 * 8 bits)   */
+	.txfifo = SZ_128,       /* (128 * 8 bits)   */
+	.ahb_buf_size = SZ_1K,  /* (128 * 64 bits)  */
 	.quirks = 0,
 	.little_endian = true,  /* little-endian    */
 };
@@ -533,7 +547,7 @@ static void nxp_fspi_prepare_lut(struct nxp_fspi *f,
 
 	/* fill LUT */
 	for (i = 0; i < ARRAY_SIZE(lutval); i++)
-		fspi_writel(f, lutval[i], base + FSPI_LUT_REG(i));
+		fspi_writel(f, lutval[i], base + FSPI_LUT_SUQ_REG(i));
 
 	dev_dbg(f->dev, "CMD[%x] lutval[0:%x \t 1:%x \t 2:%x \t 3:%x], size: 0x%08x\n",
 		op->cmd.opcode, lutval[0], lutval[1], lutval[2], lutval[3], op->data.nbytes);
@@ -567,6 +581,17 @@ static void nxp_fspi_clk_disable_unprep(struct nxp_fspi *f)
 	clk_disable(&f->clk_en);
 }
 #endif
+
+static void nxp_fspi_ahb_lut(struct nxp_fspi *f, u8 wr, u8 rd)
+{
+	void __iomem *base = f->iobase;
+	u32 reg = wr << FSPI_FLSHXCR2_AWRSEQI_SHIFT | rd << FSPI_FLSHXCR2_ARDSEQI_SHIFT;
+
+	fspi_writel(f, reg, base + FSPI_FLSHA1CR2);
+	fspi_writel(f, reg, base + FSPI_FLSHA2CR2);
+	fspi_writel(f, reg, base + FSPI_FLSHB1CR2);
+	fspi_writel(f, reg, base + FSPI_FLSHB2CR2);
+}
 
 /*
  * In FlexSPI controller, flash access is based on value of FSPI_FLSHXXCR0
@@ -606,6 +631,7 @@ static void nxp_fspi_clk_disable_unprep(struct nxp_fspi *f)
  * Value for rest of the CS FLSHxxCR0 register would be zero.
  *
  */
+
 static void nxp_fspi_select_mem(struct nxp_fspi *f, int chip_select)
 {
 	u64 size_kb;
@@ -788,6 +814,7 @@ static int nxp_fspi_exec_op(struct spi_slave *slave,
 	 * to access the flash. Read via AHB bus may be corrupted due to
 	 * existence of an errata and therefore discard AHB read in such cases.
 	 */
+	nxp_fspi_ahb_lut(f, SEQID_LUT_WRITE, SEQID_LUT);
 	if (op->data.nbytes > (f->devtype_data->rxfifo - 4) &&
 	    op->data.dir == SPI_MEM_DATA_IN &&
 	    !needs_ip_only(f)) {
@@ -798,6 +825,7 @@ static int nxp_fspi_exec_op(struct spi_slave *slave,
 
 		err = nxp_fspi_do_op(f, op);
 	}
+	nxp_fspi_ahb_lut(f, SEQID_LUT_WRITE, SEQID_LUT_READ);
 
 	/* Invalidate the data in the AHB buffer. */
 	nxp_fspi_invalid(f);
@@ -900,7 +928,11 @@ static int nxp_fspi_default_setup(struct nxp_fspi *f)
 
 	/* Reset the DLL register to default value */
 	fspi_writel(f, FSPI_DLLACR_OVRDEN, base + FSPI_DLLACR);
+	for (i = 0; i < 101; i++)
+		nop(); // ERR011377
 	fspi_writel(f, FSPI_DLLBCR_OVRDEN, base + FSPI_DLLBCR);
+	for (i = 0; i < 101; i++)
+		nop(); // ERR011377
 
 	/* enable module */
 	fspi_writel(f, FSPI_MCR0_AHB_TIMEOUT(0xFF) | FSPI_MCR0_IP_TIMEOUT(0xFF),
@@ -930,10 +962,30 @@ static int nxp_fspi_default_setup(struct nxp_fspi *f)
 		    base + FSPI_AHBCR);
 
 	/* AHB Read - Set lut sequence ID for all CS. */
-	fspi_writel(f, SEQID_LUT, base + FSPI_FLSHA1CR2);
-	fspi_writel(f, SEQID_LUT, base + FSPI_FLSHA2CR2);
-	fspi_writel(f, SEQID_LUT, base + FSPI_FLSHB1CR2);
-	fspi_writel(f, SEQID_LUT, base + FSPI_FLSHB2CR2);
+	nxp_fspi_ahb_lut(f, SEQID_LUT_WRITE, SEQID_LUT_READ);
+
+	fspi_writel(f, FSPI_LUTKEY_VALUE, f->iobase + FSPI_LUTKEY);
+	fspi_writel(f, FSPI_LCKER_UNLOCK, f->iobase + FSPI_LCKCR);
+	/* On i.MXRT we must clear LUTs first */
+	for (i = 0; i < LUT_COUNT; i++)
+		fspi_writel(f, 0, base + FSPI_LUT_REG(i));
+
+	fspi_writel(f, FSPI_MCR0_SWRST, base + FSPI_MCR0);
+	ret = fspi_readl_poll_tout(f, f->iobase + FSPI_MCR0,
+				   FSPI_MCR0_SWRST, 0, POLL_TOUT, false);
+
+	/* Set default read and write commands for the AHB bus */
+	fspi_writel(f, LUT_DEF(0, LUT_CMD, LUT_PAD(1), 0x0B) |
+		LUT_DEF(1, LUT_ADDR, LUT_PAD(1), 24), base + FSPI_LUT_REG(20));
+	fspi_writel(f, LUT_DEF(0, LUT_DUMMY, LUT_PAD(1), 8) |
+		LUT_DEF(1, LUT_NXP_READ, LUT_PAD(1), 1), base + FSPI_LUT_REG(21));
+
+	fspi_writel(f, LUT_DEF(0, LUT_CMD, LUT_PAD(1), 0x02) |
+		LUT_DEF(1, LUT_ADDR, LUT_PAD(1), 24), base + FSPI_LUT_REG(24));
+	fspi_writel(f, LUT_DEF(0, LUT_NXP_WRITE, LUT_PAD(1), 1), base + FSPI_LUT_REG(25));
+
+	fspi_writel(f, FSPI_LUTKEY_VALUE, f->iobase + FSPI_LUTKEY);
+	fspi_writel(f, FSPI_LCKER_LOCK, f->iobase + FSPI_LCKCR);
 
 	return 0;
 }
@@ -1054,6 +1106,7 @@ static const struct dm_spi_ops nxp_fspi_ops = {
 static const struct udevice_id nxp_fspi_ids[] = {
 	{ .compatible = "nxp,lx2160a-fspi", .data = (ulong)&lx2160a_data, },
 	{ .compatible = "nxp,imx8mm-fspi", .data = (ulong)&imx8mm_data, },
+	{ .compatible = "nxp,imxrt1050-fspi", .data = (ulong)&imxrt1050_data, },
 	{ }
 };
 
