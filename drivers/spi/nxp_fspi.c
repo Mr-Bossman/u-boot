@@ -52,6 +52,7 @@
 #include <linux/iopoll.h>
 #include <linux/bug.h>
 #include <linux/err.h>
+#include <asm/system.h>
 
 /*
  * The driver only uses one single LUT entry, that is updated on
@@ -866,8 +867,6 @@ static int nxp_fspi_default_setup(struct nxp_fspi *f)
 	u32 reg;
 
 #if CONFIG_IS_ENABLED(CLK)
-	/* disable and unprepare clock to avoid glitch pass to controller */
-	nxp_fspi_clk_disable_unprep(f);
 
 	/* the default frequency, we will change it later if necessary. */
 	ret = clk_set_rate(&f->clk, 20000000);
@@ -992,31 +991,33 @@ static int nxp_fspi_set_mode(struct udevice *bus, uint mode)
 static int nxp_fspi_of_to_plat(struct udevice *bus)
 {
 	struct nxp_fspi *f = dev_get_priv(bus);
-#if CONFIG_IS_ENABLED(CLK)
 	int ret;
-#endif
-
-	fdt_addr_t iobase;
-	fdt_addr_t iobase_size;
-	fdt_addr_t ahb_addr;
-	fdt_addr_t ahb_size;
+	const void *blob = gd->fdt_blob;
+	int node = dev_of_offset(bus);
+	struct fdt_resource res;
 
 	f->dev = bus;
 
-	iobase = devfdt_get_addr_size_name(bus, "fspi_base", &iobase_size);
-	if (iobase == FDT_ADDR_T_NONE) {
-		dev_err(bus, "fspi_base regs missing\n");
-		return -ENODEV;
+	/* find the resources */
+	ret = fdt_get_named_resource(blob, node, "reg", "reg-names", "fspi_base",
+				     &res);
+	if (ret) {
+		dev_err(bus, "Can't get regs fspi_base address(ret = %d)!\n", ret);
+		return -ENOMEM;
 	}
-	f->iobase = map_physmem(iobase, iobase_size, MAP_NOCACHE);
 
-	ahb_addr = devfdt_get_addr_size_name(bus, "fspi_mmap", &ahb_size);
-	if (ahb_addr == FDT_ADDR_T_NONE) {
-		dev_err(bus, "fspi_mmap regs missing\n");
-		return -ENODEV;
+	f->iobase = map_physmem(res.start, res.end - res.start, MAP_NOCACHE);
+
+	ret = fdt_get_named_resource(blob, node, "reg", "reg-names",
+				     "fspi_mmap", &res);
+	if (ret) {
+		dev_err(bus, "Can't get fspi_mmap base address(ret = %d)!\n", ret);
+		return -ENOMEM;
 	}
-	f->ahb_addr = map_physmem(ahb_addr, ahb_size, MAP_NOCACHE);
-	f->memmap_phy_size = ahb_size;
+
+	f->ahb_addr = map_physmem(res.start, res.end - res.start, MAP_NOCACHE);
+	f->memmap_phy = res.start;
+	f->memmap_phy_size = res.end - res.start;
 
 #if CONFIG_IS_ENABLED(CLK)
 	ret = clk_get_by_name(bus, "fspi_en", &f->clk_en);
@@ -1032,7 +1033,7 @@ static int nxp_fspi_of_to_plat(struct udevice *bus)
 	}
 #endif
 
-	dev_dbg(bus, "iobase=<0x%llx>, ahb_addr=<0x%llx>\n", iobase, ahb_addr);
+	dev_dbg(bus, "iobase=<0x%p>, ahb_addr=<0x%p>\n", f->iobase, f->ahb_addr);
 
 	return 0;
 }
