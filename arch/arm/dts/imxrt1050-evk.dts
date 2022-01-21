@@ -31,6 +31,23 @@
 	status = "okay";
 };
 
+&flexspi {
+	num-cs = <1>;
+	pinctrl-0 = <&pinctrl_fspi>;
+	pinctrl-names = "default";
+	status = "okay";
+	spiflash: spiflash@0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible =  "issi,is25wp064","jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <33000000>;
+		spi-tx-bus-width = <4>;
+		spi-rx-bus-width = <4>;
+		status = "okay";
+	};
+};
+
 &semc {
 	/*
 	 * Memory configuration from sdram datasheet IS42S16160J-6BLI
@@ -211,6 +228,17 @@
 				MXRT1050_IOMUXC_GPIO_B1_03_LCD_DATA15		0x1b0b1
 				MXRT1050_IOMUXC_GPIO_B1_15_GPIO2_IO31		0x0b069
 				MXRT1050_IOMUXC_GPIO_AD_B0_02_GPIO1_IO02	0x0b069
+			>;
+		};
+
+		pinctrl_fspi: fspigrp {
+			fsl,pins = <
+				MXRT1050_IOMUXC_GPIO_SD_B1_07_FLEXSPI_A_SCLK 0x100F9
+				MXRT1050_IOMUXC_GPIO_SD_B1_06_FLEXSPI_A_SS0_B 0x1B0F9
+				MXRT1050_IOMUXC_GPIO_SD_B1_08_FLEXSPI_A_DATA0 0x170F9
+				MXRT1050_IOMUXC_GPIO_SD_B1_09_FLEXSPI_A_DATA1 0x170F9
+				MXRT1050_IOMUXC_GPIO_SD_B1_10_FLEXSPI_A_DATA2 0x170F9
+				MXRT1050_IOMUXC_GPIO_SD_B1_11_FLEXSPI_A_DATA3 0x170F9
 			>;
 		};
 	};
