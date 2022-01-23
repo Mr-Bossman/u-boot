@@ -1,0 +1,5 @@
+formating
+ahb write doesnt work with mw 
+this is due to using psram write 
+spi min freq with semc is 30MHz set in dts
+decriptions
