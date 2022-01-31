@@ -241,6 +241,25 @@ uint32_t sunxi_get_boot_device(void)
 	return -1;		/* Never reached */
 }
 
+uint32_t suniv_get_boot_device(void)
+{
+	/* Get the last function call from BootRom's stack. */
+	u32 brom_call = *(u32*)(fel_stash.sp-4);
+
+	switch (brom_call) {
+		case SUNIV_BOOTED_FROM_MMC0:
+			return BOOT_DEVICE_MMC1;
+		case SUNIV_BOOTED_FROM_NAND:
+		case SUNIV_BOOTED_FROM_SPI:
+			return BOOT_DEVICE_SPI;
+		case SUNIV_BOOTED_FROM_MMC1:
+			return BOOT_DEVICE_MMC2;
+	}
+
+	printf ("Unknown boot source from BROM: 0x%x\n", brom_call);
+	return BOOT_DEVICE_MMC1;
+}
+
 #ifdef CONFIG_SPL_BUILD
 static u32 sunxi_get_spl_size(void)
 {
@@ -276,31 +295,13 @@ unsigned long spl_mmc_get_uboot_raw_sector(struct mmc *mmc,
 	return sector;
 }
 
-#ifndef CONFIG_MACH_SUNIV
 u32 spl_boot_device(void)
 {
-	return sunxi_get_boot_device();
+	if (IS_ENABLED(CONFIG_MACH_SUNIV))
+		return suniv_get_boot_device();
+	else
+		return sunxi_get_boot_device();
 }
-#else
-/*
- * suniv BROM do not pass the boot media type to SPL, so we try with the
- * boot sequence in BROM: mmc0->spinor->fail.
- */
-void board_boot_order(u32 *spl_boot_list)
-{
-	/*
-	 * See the comments above in sunxi_get_boot_device() for information
-	 * about FEL boot.
-	 */
-	if (!is_boot0_magic(SPL_ADDR + 4)) {
-		spl_boot_list[0] = BOOT_DEVICE_BOARD;
-		return;
-	}
-
-	spl_boot_list[0] = BOOT_DEVICE_MMC1;
-	spl_boot_list[1] = BOOT_DEVICE_SPI;
-}
-#endif
 
 __weak void sunxi_sram_init(void)
 {
