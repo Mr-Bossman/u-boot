@@ -245,13 +245,15 @@ static int sun4i_spi_parse_pins(struct udevice *dev)
 					break;
 			}
 
-			pin = sunxi_name_to_gpio(pin_name);
+			pin = sunxi_gpio_parse_pin_name(pin_name);
 			if (pin < 0)
 				break;
 
 			if (IS_ENABLED(CONFIG_MACH_SUN50I) ||
 			    IS_ENABLED(CONFIG_SUN50I_GEN_H6))
 				sunxi_gpio_set_cfgpin(pin, SUN50I_GPC_SPI0);
+			else if (IS_ENABLED(CONFIG_MACH_SUNIV))
+				sunxi_gpio_set_cfgpin(pin, SUNIV_GPC_SPI0);
 			else
 				sunxi_gpio_set_cfgpin(pin, SUNXI_GPC_SPI0);
 			sunxi_gpio_set_drv(pin, drive);
@@ -329,9 +331,9 @@ static int sun4i_spi_release_bus(struct udevice *dev)
 {
 	struct sun4i_spi_priv *priv = dev_get_priv(dev->parent);
 
-	clrbits_le32(SPI_REG(priv, SPI_GCR), SUN4I_CTL_ENABLE);
+	//clrbits_le32(SPI_REG(priv, SPI_GCR), SUN4I_CTL_ENABLE);
 
-	sun4i_spi_set_clock(dev->parent, false);
+	//sun4i_spi_set_clock(dev->parent, false);
 
 	return 0;
 }
@@ -414,6 +416,8 @@ static int sun4i_spi_set_speed(struct udevice *dev, uint speed)
 	unsigned int div;
 	u32 reg;
 
+	/* suniv doesnt allow writes to registers without gateing enabled */
+	sun4i_spi_set_clock(dev,true);
 	if (speed > plat->max_hz)
 		speed = plat->max_hz;
 
