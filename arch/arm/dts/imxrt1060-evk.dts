@@ -7,10 +7,10 @@
 /dts-v1/;
 #include "imxrt1060.dtsi"
 #include "imxrt1060-evk-u-boot.dtsi"
-#include <dt-bindings/pinctrl/pins-imxrt1060.h>
+#include "imxrt1060-pinfunc.h"
 
 / {
-	model = "NXP imxrt060-evk board";
+	model = "NXP imxrt1060-evk board";
 	compatible = "fsl,imxrt1060-evk", "fsl,imxrt1060";
 
 	chosen {

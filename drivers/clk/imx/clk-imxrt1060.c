@@ -117,7 +117,7 @@ static int imxrt1060_clk_probe(struct udevice *dev)
 	void *base;
 
 	/* Anatop clocks */
-	base = (void *)ANATOP_BASE_ADDR;
+	base = ofnode_get_addr(ofnode_by_compatible(ofnode_null(), "fsl,imxrt-anatop"));
 
 	clk_dm(IMXRT1060_CLK_PLL1_REF_SEL,
 	       imx_clk_mux("pll1_arm_ref_sel", base + 0x0, 14, 2,
