@@ -10,6 +10,7 @@
 #include <asm/armv7_mpu.h>
 #include <asm/mach-imx/sys_proto.h>
 #include <linux/bitops.h>
+#include <spl.h>
 
 int arch_cpu_init(void)
 {
@@ -48,4 +49,18 @@ u32 get_cpu_rev(void)
 #else
 #error This IMXRT SoC is not supported
 #endif
+}
+
+
+void __noreturn jump_to_image_no_args(struct spl_image_info *spl_image)
+{
+	typedef void __noreturn (*image_entry_noargs_t)(void);
+	image_entry_noargs_t image_entry = NULL;
+
+	/* Call reset vector, as jumping to the vector table causes usagefault */
+	spl_image->entry_point = ((size_t*)(spl_image->entry_point - 1))[1];
+	image_entry = (image_entry_noargs_t)spl_image->entry_point;
+
+	printf("image entry point: 0x%lx\n", spl_image->entry_point);
+	image_entry();
 }
