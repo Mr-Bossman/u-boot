@@ -26,9 +26,15 @@
 		serial0 = &lpuart1;
 	};
 
+/*
 	memory@80000000 {
 		device_type = "memory";
 		reg = <0x80000000 0x2000000>;
+	};
+*/
+	memory@20200000 {
+		device_type = "memory";
+		reg = <0x20200000 0x60000>;
 	};
 };
 
