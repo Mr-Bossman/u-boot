@@ -8,6 +8,13 @@
 #include "imxrt1050-pinfunc.h"
 
 / {
+	/delete-node/ memory@80000000;
+
+	memory@20200000 {
+		device_type = "memory";
+		reg = <0x20200000 0x60000>;
+	};
+
 	binman: binman {
 		multiple-images;
 	};
