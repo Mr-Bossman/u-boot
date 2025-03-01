@@ -9,6 +9,7 @@
 #include <asm/armv7_mpu.h>
 #include <asm/mach-imx/sys_proto.h>
 #include <linux/bitops.h>
+#include <dm/device.h>
 
 int arch_cpu_init(void)
 {
@@ -32,6 +33,8 @@ int arch_cpu_init(void)
 	for (i = 0; i < ARRAY_SIZE(imxrt_region_config); i++)
 		mpu_config(&imxrt_region_config[i]);
 	enable_mpu();
+
+	gd->flags |= GD_FLG_SKIP_RELOC;
 
 	return 0;
 }
