@@ -152,6 +152,33 @@
 	bootph-pre-ram;
 };
 
+&fec {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_fec>;
+	phy-mode = "rmii";
+	phy-reset-duration = <1>;
+	phy-reset-post-delay = <1>;
+	phy-handle = <&ethphy0>;
+	status = "okay";
+
+	mdio {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		ethphy0: ethernet-phy@2 {
+			compatible = "ethernet-phy-ieee802.3-c22";
+			reg = <2>;
+			max-speed = <100>;
+			micrel,led-mode = <1>;
+			interrupts-extended = <&gpio1 10 IRQ_TYPE_LEVEL_LOW>;
+			reset-assert-us = <10000>;
+			reset-deassert-us = <300>;
+			clocks = <&clks IMXRT1050_CLK_ENET>;
+			clock-names = "rmii-ref";
+		};
+	};
+};
+
 &clks {
 	bootph-pre-ram;
 };
@@ -317,6 +344,22 @@
 
 	pinctrl_usdhc0: usdhc0grp {
 		bootph-pre-ram;
+	};
+
+	pinctrl_fec: fecgrp {
+		fsl,pins = <
+			MXRT1050_IOMUXC_GPIO_EMC_41_ENET_MDIO		0xb829	/* ENET_MDIO */
+			MXRT1050_IOMUXC_GPIO_EMC_40_ENET_MDC		0xb0e9	/* ENET_MDC */
+			MXRT1050_IOMUXC_GPIO_B1_04_ENET_RX_DATA00	0xb0e9	/* ENET_RXD0 */
+			MXRT1050_IOMUXC_GPIO_B1_05_ENET_RX_DATA01	0xb0e9	/* ENET_RXD1 */
+			MXRT1050_IOMUXC_GPIO_B1_06_ENET_RX_EN		0xb0e9	/* ENET_CRS_DV */
+			MXRT1050_IOMUXC_GPIO_B1_07_ENET_TX_DATA00	0xb0e9	/* ENET_TXD0 */
+			MXRT1050_IOMUXC_GPIO_B1_08_ENET_TX_DATA01	0xb0e9	/* ENET_TXD1 */
+			MXRT1050_IOMUXC_GPIO_B1_09_ENET_TX_EN		0xb0e9	/* ENET_TXEN */
+			MXRT1050_IOMUXC_GPIO_B1_10_ENET_REF_CLK		0x40000031 /* ENET_TX_CLK */
+			MXRT1050_IOMUXC_GPIO_B1_11_ENET_RX_ER		0xb0e9	/* ENET_RXER */
+			MXRT1050_IOMUXC_GPIO_AD_B0_10_GPIO1_IO10	0xb0a9	/* ENET_INT */
+		>;
 	};
  };
 

@@ -9,6 +9,14 @@
 
 #include <asm/arch/imx-regs.h>
 
+/* ENET */
+#define CONFIG_FEC_ENET_DEV		0
+#define IMX_FEC_BASE			0x402D8000
+#define CONFIG_FEC_XCV_TYPE		RMII
+#define CONFIG_FEC_MXC_PHYADDR		0x01
+#define FEC_QUIRK_ENET_MAC
+#define FEC_QUIRK_HAS_RACC
+
 #define ESDHCI_QUIRK_BROKEN_TIMEOUT_VALUE	1
 
 #define PHYS_SDRAM			0x80000000

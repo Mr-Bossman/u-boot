@@ -19,6 +19,7 @@ static const char * const pll1_bypass_sels[] = {"pll1_arm", "pll1_arm_ref_sel", 
 static const char * const pll2_bypass_sels[] = {"pll2_sys", "pll2_sys_ref_sel", };
 static const char * const pll3_bypass_sels[] = {"pll3_usb_otg", "pll3_usb_otg_ref_sel", };
 static const char * const pll5_bypass_sels[] = {"pll5_video", "pll5_video_ref_sel", };
+static const char * const pll6_bypass_sels[] = {"pll6_enet", "pll6_enet_ref_sel", };
 
 static const char *const pre_periph_sels[] = { "pll2_sys", "pll2_pfd2_396m", "pll2_pfd0_352m", "arm_podf", };
 static const char *const periph_sels[] = { "pre_periph_sel", "todo", };
@@ -27,6 +28,14 @@ static const char *const lpuart_sels[] = { "pll3_80m", "osc", };
 static const char *const semc_alt_sels[] = { "pll2_pfd2_396m", "pll3_pfd1_664_62m", };
 static const char *const semc_sels[] = { "periph_sel", "semc_alt_sel", };
 static const char *const lcdif_sels[] = { "pll2_sys", "pll3_pfd3_454_74m", "pll5_video", "pll2_pfd0_352m", "pll2_pfd1_594m", "pll3_pfd1_664_62m"};
+
+static const struct clk_div_table clk_enet_ref_table[] = {
+	{ .val = 0, .div = 20, },
+	{ .val = 1, .div = 10, },
+	{ .val = 2, .div = 5, },
+	{ .val = 3, .div = 4, },
+	{ }
+};
 
 static int imxrt1050_clk_probe(struct udevice *dev)
 {
@@ -47,6 +56,9 @@ static int imxrt1050_clk_probe(struct udevice *dev)
 	clk_dm(IMXRT1050_CLK_PLL5_REF_SEL,
 	       imx_clk_mux("pll5_video_ref_sel", base + 0xa0, 14, 2,
 			   pll_ref_sels, ARRAY_SIZE(pll_ref_sels)));
+	clk_dm(IMXRT1050_CLK_PLL6_REF_SEL,
+	       imx_clk_mux("pll6_enet_ref_sel", base + 0xe0, 14, 2,
+			   pll_ref_sels, ARRAY_SIZE(pll_ref_sels)));
 
 	clk_dm(IMXRT1050_CLK_PLL1_ARM,
 	       imx_clk_pllv3(IMX_PLLV3_SYS, "pll1_arm", "pll1_arm_ref_sel",
@@ -61,6 +73,9 @@ static int imxrt1050_clk_probe(struct udevice *dev)
 	clk_dm(IMXRT1050_CLK_PLL5_VIDEO,
 	       imx_clk_pllv3(IMX_PLLV3_AV, "pll5_video", "pll5_video_ref_sel",
 			     base + 0xa0, 0x7f));
+	clk_dm(IMXRT1050_CLK_PLL6_ENET,
+	       imx_clk_pllv3(IMX_PLLV3_ENET, "pll6_enet", "pll6_enet_ref_sel",
+			     base + 0xe0, 0x3));
 
 	/* PLL bypass out */
 	clk_dm(IMXRT1050_CLK_PLL1_BYPASS,
@@ -83,6 +98,11 @@ static int imxrt1050_clk_probe(struct udevice *dev)
 				 pll5_bypass_sels,
 				 ARRAY_SIZE(pll5_bypass_sels),
 				 CLK_SET_RATE_PARENT));
+	clk_dm(IMXRT1050_CLK_PLL6_BYPASS,
+	       imx_clk_mux_flags("pll6_bypass", base + 0xe0, 16, 1,
+				 pll6_bypass_sels,
+				 ARRAY_SIZE(pll6_bypass_sels),
+				 CLK_SET_RATE_PARENT));
 
 	clk_dm(IMXRT1050_CLK_VIDEO_POST_DIV_SEL,
 	       imx_clk_divider("video_post_div_sel", "pll5_video",
@@ -90,6 +110,9 @@ static int imxrt1050_clk_probe(struct udevice *dev)
 	clk_dm(IMXRT1050_CLK_VIDEO_DIV,
 	       imx_clk_divider("video_div", "video_post_div_sel",
 			       base + 0x170, 30, 2));
+
+	clk_dm(IMXRT1050_CLK_ENET_REF,
+	       imx_clk_divider3("enet_ref", "pll6_enet", base + 0xe0, 0, 2, clk_enet_ref_table));
 
 	clk_dm(IMXRT1050_CLK_PLL3_80M,
 	       imx_clk_fixed_factor("pll3_80m",  "pll3_usb_otg",   1, 6));
@@ -106,6 +129,9 @@ static int imxrt1050_clk_probe(struct udevice *dev)
 	clk_dm(IMXRT1050_CLK_PLL3_PFD3_454_74M,
 	       imx_clk_pfd("pll3_pfd3_454_74m", "pll3_usb_otg", base + 0xf0,
 			   3));
+	clk_dm(IMXRT1050_CLK_PLL3_PFD0_720M,
+	       imx_clk_pfd("pll3_pfd0_720m", "pll3_usb_otg", base + 0xf0,
+			   0));
 
 	/* CCM clocks */
 	base = dev_read_addr_ptr(dev);
@@ -180,6 +206,9 @@ static int imxrt1050_clk_probe(struct udevice *dev)
 	       imx_clk_gate2("lcdif_pix", "lcdif", base + 0x74, 10));
 	clk_dm(IMXRT1050_CLK_USBOH3,
 	       imx_clk_gate2("usboh3", "pll3_usb_otg", base + 0x80, 0));
+	clk_dm(IMXRT1050_CLK_ENET,
+	       imx_clk_gate2("enet", "pll6_enet", base + 0x6c, 10));
+
 
 	struct clk *clk, *clk1;
 
@@ -221,6 +250,15 @@ static int imxrt1050_clk_probe(struct udevice *dev)
 	clk_set_rate(clk, 650000000UL);
 
 	clk_get_by_id(IMXRT1050_CLK_PLL5_BYPASS, &clk1);
+	clk_set_parent(clk1, clk);
+
+
+	/* Set PLL6 for ENET to its default 50Mhz */
+	clk_get_by_id(IMXRT1050_CLK_PLL6_ENET, &clk);
+	clk_enable(clk);
+	clk_set_rate(clk, 50000000UL);
+
+	clk_get_by_id(IMXRT1050_CLK_PLL6_BYPASS, &clk1);
 	clk_set_parent(clk1, clk);
 #endif
 

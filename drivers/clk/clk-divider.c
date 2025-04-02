@@ -241,6 +241,20 @@ struct clk *clk_register_divider(struct device *dev, const char *name,
 	return clk;
 }
 
+struct clk *clk_register_divider3(struct device *dev, const char *name,
+		const char *parent_name, unsigned long flags,
+		void __iomem *reg, u8 shift, u8 width,
+		u8 clk_divider_flags, const struct clk_div_table *table)
+{
+	struct clk *clk;
+
+	clk =  _register_divider(dev, name, parent_name, flags, reg, shift,
+				 width, clk_divider_flags, table);
+	if (IS_ERR(clk))
+		return ERR_CAST(clk);
+	return clk;
+}
+
 U_BOOT_DRIVER(ccf_clk_divider) = {
 	.name	= UBOOT_DM_CLK_CCF_DIVIDER,
 	.id	= UCLASS_CLK,

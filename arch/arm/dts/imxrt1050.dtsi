@@ -43,6 +43,27 @@
 			fsl,mux_mask = <0x7>;
 		};
 
+		gpr: iomuxc-gpr@400ac000 {
+			compatible = "syscon";
+			reg = <0x400ac000 0x4000>;
+		};
+
+		fec: ethernet@402d8000 {
+			compatible = "fsl,imxrt-fec", "fsl,imx6ul-fec";
+			reg = <0x402d8000 0x4000>;
+			interrupt-names = "int0", "pps";
+			interrupts = <114>, <115>;
+			fsl,num-tx-queues = <1>;
+			fsl,num-rx-queues = <1>;
+			clocks = <&clks IMXRT1050_CLK_ENET>,
+				 <&clks IMXRT1050_CLK_ENET>,
+				 <&clks IMXRT1050_CLK_ENET>,
+				 <&clks IMXRT1050_CLK_ENET>;
+			clock-names = "ipg", "ahb", "ptp","enet_clk_ref";
+			fsl,stop-mode = <&gpr 0x10 4>;
+			status = "disabled";
+		};
+
 		anatop: anatop@400d8000 {
 			compatible = "fsl,imxrt-anatop";
 			reg = <0x400d8000 0x4000>;

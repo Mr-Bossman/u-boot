@@ -160,6 +160,13 @@ static inline struct clk *imx_clk_divider2(const char *name, const char *parent,
 			reg, shift, width, 0);
 }
 
+static inline struct clk *imx_clk_divider3(const char *name, const char *parent,
+		void __iomem *reg, u8 shift, u8 width, const struct clk_div_table *table)
+{
+	return clk_register_divider3(NULL, name, parent,
+			0, reg, shift, width, 0, table);
+}
+
 struct clk *imx_clk_pfd(const char *name, const char *parent_name,
 			void __iomem *reg, u8 idx);
 

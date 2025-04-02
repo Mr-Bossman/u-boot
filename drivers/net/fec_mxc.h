@@ -279,7 +279,7 @@ struct fec_priv {
  * The number defines the stocked memory buffers for the receiving task.
  * Larger values makes no sense in this limited environment.
  */
-#define FEC_RBD_NUM		64
+#define FEC_RBD_NUM		16
 
 /**
  * @brief Define the ethernet packet size limit in memory

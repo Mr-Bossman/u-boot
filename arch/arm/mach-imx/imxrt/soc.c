@@ -48,3 +48,30 @@ u32 get_cpu_rev(void)
 #error This IMXRT SoC is not supported
 #endif
 }
+
+#if defined(CONFIG_FEC_MXC)
+
+struct imxrt_mac_fuse {
+	u32 mac_addr0;
+	u32 mac_addr1;
+};
+
+#define MAC_FUSE_IMXRT_OFFSET  0x620
+
+void imx_get_mac_from_fuse(int dev_id, unsigned char *mac)
+{
+	struct imxrt_mac_fuse *fuse = (struct imxrt_mac_fuse *)(ulong)
+                                     (OCOTP_BASE_ADDR + MAC_FUSE_IMXRT_OFFSET);
+
+	u32 value = readl(&fuse->mac_addr1);
+
+	mac[0] = value >> 8;
+	mac[1] = value;
+
+	value = readl(&fuse->mac_addr0);
+	mac[2] = value >> 24;
+	mac[3] = value >> 16;
+	mac[4] = value >> 8;
+	mac[5] = value;
+}
+#endif
